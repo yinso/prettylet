@@ -1,4 +1,4 @@
-json = require './src/json'
+json = require '../src/json'
 
 console.log json.prettify {
   foo: 

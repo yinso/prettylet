@@ -1,4 +1,4 @@
-xml = require './src/xml'
+xml = require '../src/xml'
 
 console.log xml.prettify {
   tag: 'html'
