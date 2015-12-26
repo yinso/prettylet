@@ -12,27 +12,12 @@
     "node": ">= 0.8.4"
   },
   "scripts": {
-    "test": "make test",
     "prepublish": "make"
   },
   "dependencies": {
-    "yargs": "=1.3.2",
-    "coffee-script": "=1.8.0",
-    "underscore": "=1.7.0",
-    "loglet": ">=0.1.0",
-    "pegjs": "=0.8.0",
-    "errorlet": ">=0.1.1",
-    "lie": "=2.8.1",
-    "escodegen": "=1.6.1",
-    "repl.history": "=0.1.3",
-    "async": "=1.3.0"
   },
   "devDependencies": {
-    "testlet": ">= 0.2.0",
-    "coffee-bean": "=0.3.0"
-  },
-  "browser": {
-    "lie": "./node_modules/lie/dist/lie.js"
+    "coffee-script": "=1.8.0"
   },
   "keywords": [
     "pretty-print",
