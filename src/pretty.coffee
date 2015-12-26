@@ -1,6 +1,7 @@
 Buffer = require './buffer'
 Tab = require './tab'
 Collection = require './collection'
+KeyVal = require './keyval'
 Literal = require './literal'
 
 prettify = (obj, converter) ->
@@ -15,4 +16,5 @@ module.exports =
   Tab: Tab
   Collection: Collection
   Literal: Literal
+  KeyVal: KeyVal
 

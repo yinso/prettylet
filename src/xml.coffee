@@ -1,14 +1,9 @@
 pretty = require './pretty'
 
-class KeyValTab extends pretty.Tab
+class KeyValTab extends pretty.KeyVal
   constructor: (@key, val, @delim = '=') ->
-    @val = new pretty.Literal val, (v) -> JSON.stringify(v)
-  oneLine: (buffer, level) ->
-    buffer.pushOneLine @key , @delim
-    @val.oneLine buffer, level
-  multiLine: (buffer, level) ->
-    buffer.push @key, @delim
-    @val.multiLine buffer, level
+    val = new pretty.Literal val, (v) -> JSON.stringify(v)
+    super @key, val, @delim
 
 class AttrListTab extends pretty.Collection
   constructor: (attrs) ->
@@ -54,7 +49,7 @@ class ElementTab extends pretty.Collection
       buffer.push "<#{@tag}>"
     else
       buffer.push "<#{@tag}"
-      @attrs.multiLine buffer, level + 2
+      @attrs.multiLine buffer, level + 1
       buffer.push ">"
   _multiLineClose: (buffer, level) ->
     buffer.fixedTab level

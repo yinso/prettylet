@@ -4,6 +4,17 @@
 
 pretty = require './pretty'
 
+class KeyValTab extends pretty.KeyVal
+  constructor: (key, val) ->
+    super key, val, ':'
+  _getKey: () ->
+    JSON.stringify(@key)
+  _oneLineDelim: (buffer, level) ->
+    buffer.pushOneLine @delim, ' '
+  _multiLineDelim: (buffer, level) ->
+    buffer.push @delim, ' '
+
+###
 class KeyValTab extends pretty.Tab
   constructor: (@key, @val, @delim = ':') ->
   depth: () ->
@@ -20,6 +31,7 @@ class KeyValTab extends pretty.Tab
   multiLine: (buffer, level) ->
     buffer.push JSON.stringify(@key), @delim, ' '
     @val.multiLine buffer, level
+###
 
 class JsonTab extends pretty.Collection
   @convert: (obj) ->
