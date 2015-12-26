@@ -2,11 +2,11 @@
 
 Pretty = require '../src/pretty'
 
-class ExpressionTab extends Pretty.Tab
+class Expression extends Pretty.Tab
   @types: {}
   @register: (converter) ->
     if @types.hasOwnProperty(converter.name)
-      throw new Error("ExpressionTab.duplicate: " + converter.name)
+      throw new Error("Expression.duplicate: " + converter.name)
     else
       @types[converter.name] = converter
   @typeMaps: {
@@ -17,6 +17,9 @@ class ExpressionTab extends Pretty.Tab
     IfExpression: 'If'
     BlockExpression: 'Block'
     AssignmentExpression: 'Assign'
+    VariableDeclaration: 'DefineGroup'
+    VariableDeclarator: 'Decl'
+    Program: 'Program'
   }
   @mapType: (key) ->
     @typeMaps[key]
@@ -24,7 +27,7 @@ class ExpressionTab extends Pretty.Tab
     if @types.hasOwnProperty(type)
       @types[type]
     else
-      throw new Error("ExpressionTab.unknownType: " + type)
+      throw new Error("Expression.unknownType: " + type)
   @convert: (obj) ->
     if typeof(obj) == 'object'
       if obj == null
@@ -87,12 +90,12 @@ class ExpressionTab extends Pretty.Tab
     'new': 17
     '(': 17
   }
-ExpressionTab.register class Literal extends Pretty.Literal
+Expression.register class Literal extends Pretty.Literal
   @convert: (obj) ->
     new @ obj.value
   precedence: () -> Infinity
 
-ExpressionTab.register class Symbol extends ExpressionTab
+Expression.register class Symbol extends Expression
   @convert: (obj) ->
     if obj.name == 'undefined'
       new Pretty.Literal 'undefined'
@@ -105,10 +108,10 @@ ExpressionTab.register class Symbol extends ExpressionTab
     buffer.push @name
   precedence: () -> Infinity
 
-ExpressionTab.register class Binary extends ExpressionTab
+Expression.register class Binary extends Expression
   @convert: (obj) ->
-    lhs = ExpressionTab.convert(obj.lhs or obj.left)
-    rhs = ExpressionTab.convert(obj.rhs or obj.right)
+    lhs = Expression.convert(obj.lhs or obj.left)
+    rhs = Expression.convert(obj.rhs or obj.right)
     new @ obj.operator, lhs, rhs
   @preceMap:
     ',': 0
@@ -197,11 +200,11 @@ ExpressionTab.register class Binary extends ExpressionTab
     if higherThanRhs
       buffer.push ')'
 
-ExpressionTab.register class If extends ExpressionTab
+Expression.register class If extends Expression
   @convert: (obj) ->
-    condExp = ExpressionTab.convert obj.test
-    thenExp = ExpressionTab.convert obj.consequent
-    elseExp = if obj.alternate then ExpressionTab.convert obj.alternate else undefined
+    condExp = Expression.convert obj.test
+    thenExp = Expression.convert obj.consequent
+    elseExp = if obj.alternate then Expression.convert obj.alternate else undefined
     new @ condExp, thenExp, elseExp
   constructor: (@cond, @then, @else) ->
     if not (@then instanceof Block)
@@ -217,11 +220,11 @@ ExpressionTab.register class If extends ExpressionTab
       buffer.push ' else '
       @else.multiLine buffer, level
 
-ExpressionTab.register class Block extends ExpressionTab
+Expression.register class Block extends Expression
   @convert: (obj) ->
     items =
       for item in obj.body
-        ExpressionTab.convert item
+        Expression.convert item
     new @ items
   constructor: (@body) ->
   multiLine: (buffer, level) ->
@@ -233,23 +236,27 @@ ExpressionTab.register class Block extends ExpressionTab
     buffer.fixedTab level
     buffer.push '}'
 
-ExpressionTab.register class Assign extends ExpressionTab
+Expression.register class Assign extends Expression
   @convert: (obj) ->
-    name = ExpressionTab.convert obj.left
-    value = ExpressionTab.convert obj.right
+    name = Expression.convert obj.left
+    value = Expression.convert obj.right
     new @ name, value
   constructor: (@name, @value) ->
-  multiLine: (buffer, level) ->
+  _oneLine: (buffer, level) ->
+    @name.oneLine buffer, level
+    buffer.push ' = '
+    @value.oneLine buffer, level + 1
+  _multiLine: (buffer, level) ->
     @name.multiLine buffer, level
     buffer.push ' = '
     @value.multiLine buffer, level + 1
 
-ExpressionTab.register class Funcall extends ExpressionTab
+Expression.register class Funcall extends Expression
   @convert: (obj) ->
-    func = ExpressionTab.convert obj.callee
+    func = Expression.convert obj.callee
     args =
       for arg in obj.arguments
-        ExpressionTab.convert arg
+        Expression.convert arg
     new @ func, args
   constructor: (@func, @args) ->
   _oneLine: (buffer, level) ->
@@ -270,22 +277,80 @@ ExpressionTab.register class Funcall extends ExpressionTab
       arg.multiLine buffer, level + 1
     buffer.push ')'
 
-module.exports =
-  prettify: Pretty.makePrinter(ExpressionTab)
-  Expression: ExpressionTab
+Expression.register class DefineGroup extends Expression
+  @convert: (obj) ->
+    inners =
+      for decl in obj.declarations
+        Expression.convert decl
+    new @ inners
+  constructor: (@decls, @kind = 'var') -> # kind can also be let or const.
+  _oneLine: (buffer, level) ->
+    buffer.pushOneLine @kind
+    for decl, i in @decls
+      if i > 0
+        buffer.pushOneLine ','
+      buffer.pushOneLine ' '
+      decl.oneLine buffer, level + 1
+    buffer.pushOneLine ';'
+  _multiLine: (buffer, level) ->
+    buffer.push @kind
+    for decl, i in @decls
+      if i > 0
+        buffer.push ','
+      buffer.fixedTab level + 1
+      decl.multiLine buffer, level + 1
+    buffer.pushOneLine ';'
 
-console.log module.exports.prettify {
+Expression.register class Decl extends Expression
+  @convert: (obj) ->
+    name = Expression.convert obj.id
+    value =
+      if obj.init
+        Expression.convert obj.init
+      else
+        undefined
+    new @ name, value
+  constructor: (@name, @value) ->
+  _oneLine: (buffer, level) ->
+    @name.oneLine buffer, level
+    if @value
+      buffer.push ' = '
+      @value.oneLine buffer, level + 1
+  _multiLine: (buffer, level) ->
+    @name.multiLine buffer, level
+    if @value
+      buffer.push ' = '
+      @value.multiLine buffer, level + 1
+
+Expression.register class Program extends Pretty.Collection
+  @convert: (obj) ->
+    body =
+      for item in obj.body
+        Expression.convert item
+    new @ body
+  constructor: (@children) ->
+    super @children, ''
+  precedence: () -> Infinity
+  multiLine: (buffer, level) ->
+    @_multiLine buffer, level
+  _multiLine: (buffer, level) ->
+    for child, i in @children
+      @_multiLineChild buffer, level, child, i
+
+module.exports =
+  prettify: Pretty.makePrinter(Expression)
+  Expression: Expression
+
+console.log module.exports.prettify
   type: 'Identifier'
   name: 'foo'
-}
 
 console.log module.exports.prettify
   type: 'BinaryExpression'
   operator: '*'
-  left: {
+  left:
     type: 'Identifier'
     name: 'foo'
-  }
   right:
     type: 'BinaryExpression'
     operator: '+'
@@ -297,57 +362,86 @@ console.log module.exports.prettify
       value: 3
 
 console.log module.exports.prettify
-  type: 'IfExpression'
-  test:
-    type: 'BinaryExpression'
-    operator: '>'
-    left:
-      type: 'Identifier'
-      name: 'foo'
-    right:
-      type: 'Identifier'
-      name: 'bar'
-  consequent:
-    type: 'BlockExpression'
-    body: [
-      {
-        type: 'BinaryExpression'
-        operator: '*'
-        left: {
-          type: 'Identifier'
-          name: 'foo'
+  type: 'Program'
+  body: [
+    {
+      type: 'VariableDeclaration'
+      declarations: [
+        {
+          type: 'VariableDeclarator'
+          id: {
+            type: 'Identifier'
+            name: 'foo'
+          }
+          init: {
+            type: 'Literal'
+            value: 5
+          }
         }
-        right:
-          type: 'BinaryExpression'
-          operator: '+'
-          left:
+        {
+          type: 'VariableDeclarator'
+          id: {
             type: 'Identifier'
             name: 'bar'
-          right:
+          }
+          init: {
             type: 'Literal'
-            value: 3
-      }
-    ]
-  alternate:
-    type: 'AssignmentExpression'
-    operator: '='
-    left: {
-      type: 'Identifier'
-      name: 'foo'
+            value: 10
+          }
+        }
+      ]        
     }
-    right:
-      type: 'CallExpression'
-      callee:
-        type: 'Identifier'
-        name: 'baz'
-      arguments: [
-        {
+    {
+      type: 'IfExpression'
+      test:
+        type: 'BinaryExpression'
+        operator: '>'
+        left:
           type: 'Identifier'
           name: 'foo'
-        }
-        {
+        right:
           type: 'Identifier'
           name: 'bar'
-        }
-      ]
-
+      consequent:
+        type: 'BlockExpression'
+        body: [
+          {
+            type: 'BinaryExpression'
+            operator: '*'
+            left:
+              type: 'Identifier'
+              name: 'foo'
+            right:
+              type: 'BinaryExpression'
+              operator: '+'
+              left:
+                type: 'Identifier'
+                name: 'bar'
+              right:
+                type: 'Literal'
+                value: 3
+          }
+        ]
+      alternate:
+        type: 'AssignmentExpression'
+        operator: '='
+        left:
+          type: 'Identifier'
+          name: 'foo'
+        right:
+          type: 'CallExpression'
+          callee:
+            type: 'Identifier'
+            name: 'baz'
+          arguments: [
+            {
+              type: 'Identifier'
+              name: 'foo'
+            }
+            {
+              type: 'Identifier'
+              name: 'bar'
+            }
+          ]
+    }
+  ]
