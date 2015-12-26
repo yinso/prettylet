@@ -10,7 +10,12 @@ prettify = (obj, converter) ->
   converted.multiLine buffer, 0
   buffer.join()
 
+makePrinter = (converter) ->
+  (obj) ->
+    prettify obj, converter
+
 module.exports =
+  makePrinter: makePrinter
   prettify: prettify
   Buffer: Buffer
   Tab: Tab

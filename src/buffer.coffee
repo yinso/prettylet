@@ -45,6 +45,8 @@ class Buffer
     @pushArray items, true
   push: (items...) ->
     @pushArray items
+  top: () ->
+    @currentLine[@currentLine.length - 1]
   pushArray: (items, checkExceeds = false) ->
     for item in items
       if checkExceeds and @exceedsLimit(item)
