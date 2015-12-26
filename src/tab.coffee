@@ -10,7 +10,6 @@ class Tab
     try
       @oneLine buffer, level
     catch e
-      console.error 'Tab.multiLine:error', e
       @_multiLine buffer, level
   #_multiLine: (buffer, level) ->
 
