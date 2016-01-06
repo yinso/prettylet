@@ -20,6 +20,7 @@ class Expression extends Pretty.Tab
     VariableDeclaration: 'DefineGroup'
     VariableDeclarator: 'Decl'
     Program: 'Program'
+    MemberExpression: 'Member'
   }
   @mapType: (key) ->
     @typeMaps[key]
@@ -301,6 +302,21 @@ Expression.register class DefineGroup extends Expression
       decl.multiLine buffer, level + 1
     buffer.pushOneLine ';'
 
+Expression.register class Member extends Expression
+  @convert: (obj) ->
+    inner = Expression.convert obj.object
+    key = Expression.convert obj.property
+    new @ inner, key
+  constructor: (@inner, @key) ->
+  _oneLine: (buffer, level) ->
+    @inner.oneLine buffer, level
+    buffer.pushOneLine '.'
+    @key.oneLine buffer, level
+  _multiLine: (buffer, level) ->
+    @inner.multiLine buffer, level
+    buffer.push '.'
+    @key.multiLine buffer, level
+
 Expression.register class Decl extends Expression
   @convert: (obj) ->
     name = Expression.convert obj.id
@@ -443,5 +459,26 @@ console.log module.exports.prettify
               name: 'bar'
             }
           ]
+    }
+    {
+      type: 'CallExpression'
+      callee:
+        type: 'MemberExpression'
+        object:
+          type: 'Identifier'
+          name: 'console'
+        property:
+          type: 'Identifier'
+          name: 'log'
+      arguments: [
+        {
+          type: 'Identifier'
+          name: 'foo'
+        }
+        {
+          type: 'Identifier'
+          name: 'bar'
+        }
+      ]
     }
   ]
